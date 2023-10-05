@@ -33,27 +33,41 @@ app.post("/upload-request", (req, res) => {
     res.status(200).json({ fileId });
   }
 });
-app.post("/upload-status", (req, res) => {
-  res.sendStatus(200);
+
+app.get("/upload-status", (req, res) => {
+  if (req.query && req.query.fileName && req.query.fileId) {
+    getFileDetails(getFilePath(req.query.fileName, req.query.fileId))
+      .then((stats) => {
+        res.status(200).json({ totalChunkUploaded: stats.size });
+      })
+      .catch((err) => {
+        console.error("failed to read file", err);
+        res.status(400).json({
+          message: "No file with such credentials",
+          credentials: req.query,
+        });
+      });
+  }
 });
+
 app.post("/upload", (req, res) => {
   const contentRange = req.headers["content-range"];
   const fileId = req.headers["x-file-id"];
-  console.log('fileId from x-file-id', fileId)
+  //console.log("fileId from x-file-id", fileId);
   if (!contentRange) {
-    //console.log("Missing Content-Range");
+    console.log("Missing Content-Range");
     return res.status(400).json({ message: 'Missing "Content-Range" header' });
   }
 
   if (!fileId) {
-    //console.log("Missing File Id");
+    console.log("Missing File Id");
     return res.status(400).json({ message: 'Missing "X-File-Id" header' });
   }
 
   const match = contentRange.match(/bytes=(\d+)-(\d+)\/(\d+)/);
 
   if (!match) {
-    //console.log("Invalid Content-Range Format");
+    console.log("Invalid Content-Range Format");
     return res.status(400).json({ message: 'Invalid "Content-Range" Format' });
   }
 
@@ -70,7 +84,7 @@ app.post("/upload", (req, res) => {
   const busboy = Busboy({ headers: req.headers });
 
   busboy.on("error", (e) => {
-    console.error("failed upload", e);
+    console.log("failed upload", e);
     res.sendStatus(500);
   });
 
@@ -79,9 +93,9 @@ app.post("/upload", (req, res) => {
   });
 
   busboy.on("file", (_, file, fileName) => {
-    console.log('****----**** File Name: ', fileName)
+    //console.log("****----**** File Name: ", fileName);
     const filePath = getFilePath(fileName.filename, fileId);
-    console.log('This is my file path',filePath)
+    //console.log("This is my file path", filePath);
     getFileDetails(filePath)
       .then((stats) => {
         if (stats.size !== rangeStart) {
