@@ -38,6 +38,7 @@ app.get("/upload-status", (req, res) => {
   if (req.query && req.query.fileName && req.query.fileId) {
     getFileDetails(getFilePath(req.query.fileName, req.query.fileId))
       .then((stats) => {
+        console.log("*** ---> file details from local uploaded: ", stats);
         res.status(200).json({ totalChunkUploaded: stats.size });
       })
       .catch((err) => {
@@ -65,7 +66,8 @@ app.post("/upload", (req, res) => {
   }
 
   const match = contentRange.match(/bytes=(\d+)-(\d+)\/(\d+)/);
-
+  console.log("content rage form header: ", contentRange);
+  console.log("content range taken array: ", match);
   if (!match) {
     console.log("Invalid Content-Range Format");
     return res.status(400).json({ message: 'Invalid "Content-Range" Format' });
@@ -102,7 +104,12 @@ app.post("/upload", (req, res) => {
           return res.status(400).json({ message: 'Bad "chunk" provided' });
         }
 
-        file.pipe(fs.createWriteStream(filePath, { flags: "a" }));
+        file
+          .pipe(fs.createWriteStream(filePath, { flags: "a" }))
+          .on("error", (e) => {
+            console.error("failed upload", e);
+            res.sendStatus(500);
+          });
       })
       .catch((err) => {
         console.log("Fail to read file", err);
