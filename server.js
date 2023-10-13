@@ -3,6 +3,7 @@ const cors = require("cors");
 const fs = require("fs");
 const { promisify } = require("util");
 const Busboy = require("busboy");
+const path = require("path");
 
 const app = express();
 const getFileDetails = promisify(fs.stat);
@@ -10,6 +11,19 @@ const getFileDetails = promisify(fs.stat);
 app.use(express.json());
 app.use(cors());
 
+const DirAvailCheck = () => {
+  // directory availability check
+  const folderName = "uploads";
+  if (!fs.existsSync(folderName)) {
+    fs.mkdirSync(folderName);
+    console.log(`${folderName} folder created.`);
+  } else {
+    console.log(`${folderName} folder already exists.`);
+  }
+};
+
+DirAvailCheck();
+// express.statics("./uploads");
 const uniqueAlphaNumericId = (() => {
   const heyStack = "0123456789abcdefghijklmnopqrstuvwxyz";
   const randomInt = () =>
@@ -22,7 +36,38 @@ const uniqueAlphaNumericId = (() => {
 const getFilePath = (fileName, fileId) =>
   `./uploads/file-${fileId}-${fileName}`;
 
+app.get("/files", (req, res) => {
+  fs.readdir("./uploads", (err, files) => {
+    if (err) {
+      return res.status(500).z({ error: "Unable to read files" });
+    }
+    return res.json({ files });
+  });
+});
+
+app.get("/download", (req, res) => {
+  console.log({
+    req: req,
+    resQuery: req.query,
+    reqFileName: req.query.fileName,
+  });
+  if (!req.query && !req.query.fileName) {
+    return res
+      .status(400)
+      .json({ fileName: "File name does not exist in query" });
+  }
+  const filename = req.query.fileName;
+  const filePath = path.join("./uploads", filename);
+
+  res.download(filePath, filename, (err) => {
+    if (err) {
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+});
+
 app.post("/upload-request", (req, res) => {
+  DirAvailCheck();
   if (!req.body || !req.body.fileName) {
     res.status(400).json({ message: 'Missing "fileName"' });
   } else {
@@ -72,10 +117,9 @@ app.post("/upload", (req, res) => {
     console.log("Invalid Content-Range Format");
     return res.status(400).json({ message: 'Invalid "Content-Range" Format' });
   }
-
-  const rangeStart = Number(match[1]);
-  const rangeEnd = Number(match[2]);
-  const fileSize = Number(match[3]);
+  const rangeStart = Number(match[1]); // 0
+  const rangeEnd = Number(match[2]); // 12
+  const fileSize = Number(match[3]); // 12
 
   if (rangeStart >= fileSize || rangeStart >= rangeEnd || rangeEnd > fileSize) {
     return res
